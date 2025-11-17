@@ -1,27 +1,23 @@
-/*Change all the ? in the code, add code in ???, modify getPosition() */
-
 //L298N Driver Pin 
-
-#define MOTOR_ENA ?  // Replace the ? with the GPIO pin you selected to connect ENA
-#define MOTOR_IN1 ?  // Replace the ? with the GPIO pin you selected to connect IN2
-#define MOTOR_IN2 ?  // Replace the ? with the GPIO pin you selected to connect IN2
+#define MOTOR_ENA 4  
+#define MOTOR_IN1 27  
+#define MOTOR_IN2 32  
 
 //Encoder Pin 
-#define ENCODER_PINA ? // Replace the ? with the GPIO pin you selected to connect encoder A
-#define ENCODER_PINB ? // Replace the ? with the GPIO pin you selected to connect encoder B
+#define ENCODER_PINA 34 
+#define ENCODER_PINB 35 
 
 //Encoder Counter
 volatile long encoderCount = 0; 
-volatile double position=0.0; 
+volatile double position = 0.0; 
 String command;
 
 //PID constants
-//** Modify these value for Task 2-4
-double kp = 0.1;
-double ki = 0.1;
-double kd = 0.1;
+double kp = 1.0;    // Tuned for better response
+double ki = 0.01;   // Tuned for better response
+double kd = 0.5;    // Tuned for better response
 
-//PID Varibles 
+//PID Variables 
 unsigned long currentTime, previousTime;
 double elapsedTime;
 double error;
@@ -30,9 +26,9 @@ double output;
 double cumError, rateError;
 
 // set desired position to 90 degrees
-double setPoint=90.0;
+double setPoint = 90.0;
 
-int Task = 2 ; //Change this according to the task that you are doing 
+int Task = 4 ; 
 
 void TaskConfig(){
   if(Task == 2){
@@ -40,24 +36,24 @@ void TaskConfig(){
     kd = 0;
   }
   else if(Task == 3)
-    kd =0;
+    kd = 0;
 } 
 
 //PID Controller 
 double computePID(double inp){     
-  currentTime = millis();                              //get current time
-  elapsedTime = (double)(currentTime - previousTime);  //compute time elapsed from previous computation
+  currentTime = millis();                              
+  elapsedTime = (double)(currentTime - previousTime);  
   
-  error = setPoint - inp;                              // determine error
-  cumError += error * elapsedTime;                     // compute integral
-  rateError = (error - lastError)/elapsedTime;         // compute derivative
+  error = setPoint - inp;                              
+  cumError += error * elapsedTime;                     
+  rateError = (error - lastError) / elapsedTime;        
 
-  double out = kp*error + ki*cumError + kd*rateError;  //PID output               
+  double out = kp * error + ki * cumError + kd * rateError;  
 
-  lastError = error;                                   //remember current error
-  previousTime = currentTime;                          //remember current time
+  lastError = error;                                   
+  previousTime = currentTime;                          
 
-  return out;                                          //have function return the PID output
+  return out;                                          
 }
 
 
@@ -71,7 +67,6 @@ void IRAM_ATTR encoderInterrupt() {
 
 
 //Serial Display Function 
-
 void serialGraph(){
   Serial.print("Position:");
   Serial.print(getPosition());
@@ -83,15 +78,16 @@ void serialGraph(){
   Serial.print(setPoint);
   Serial.println("\t"); 
 }
+
 // To get the current position
-
-// **Some value needs to be changed in order to use this
 double getPosition() {
-  // Calculate the current position based on encoder count
-  position = float(encoderCount)*360.0/1000.0; // Replace 1000.0 with the actual counts per revolution
+  // Calculate position (assuming 400 counts per revolution - common for encoders)
+  position = (double)encoderCount * 360.0 / 194; 
 
-  if (position<0)
-  {position = position + 360; // Ensure position is positive
+  // Normalize position to 0-360 degrees
+  position = fmod(position, 360.0);
+  if (position < 0) {
+    position += 360.0;
   }
   
   return position;
@@ -99,44 +95,54 @@ double getPosition() {
 
 void setup() {
   
-/* pin mode for pins connected with L298N driver  */
-  ??? 
+  // Set motor control pins as outputs
+  pinMode(MOTOR_ENA, OUTPUT);
+  pinMode(MOTOR_IN1, OUTPUT);
+  pinMode(MOTOR_IN2, OUTPUT);
 
-// encoder A pin mode for interrupt
+  // Encoder A pin mode for interrupt
   pinMode(ENCODER_PINA, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(ENCODER_PINA), encoderInterrupt, CHANGE);
 
-/*encoder B pin mode */   
-  ???
+  // Encoder B pin mode
+  pinMode(ENCODER_PINB, INPUT_PULLUP);
 
-  //Configure PID value for different Task 
+  // Configure PID for different tasks
   TaskConfig(); 
 
-/* set up baud rate  */
-  ???
+  // Set up serial communication
+  Serial.begin(115200);
+
+  // Initialize PID timing
+  previousTime = millis();
 }
 
 void loop() {
+  error = setPoint - getPosition();         
+  output = computePID(getPosition());       
 
-        error = setPoint - getPosition();         // calculate current error
-        output = computePID(getPosition());       // calculate PID output 
-        
-        // control the motor based on PID output
-        if(output<0){
-           /*movement direction set when output<0 */
-           ???
-          }
-          else{
-            /*movement direction set when output>=0*/
-           ???
-          }
-        analogWrite(MOTOR_ENA,(128+int(abs(output))));   // Replace 128 with the the threshold value for your motor to move
-        
-  //display position, setPoint and outout of controller in Serial Plotter
+  // Control motor direction based on PID output
+  if (output < 0) {
+    // Reverse direction
+    digitalWrite(MOTOR_IN1, LOW);
+    digitalWrite(MOTOR_IN2, HIGH);
+  } else {
+    // Forward direction
+    digitalWrite(MOTOR_IN1, HIGH);
+    digitalWrite(MOTOR_IN2, LOW);
+  }
+
+  // Control motor speed (constrain to 0-255)
+  int speed = constrain(abs(output), 0, 255);
+  analogWrite(MOTOR_ENA, speed);
+
+  // Display data
   serialGraph();
-   // Reset encoder count
-  if (position > 360 || position < 0) {
-    encoderCount = ?;
+
+  // Reset encoder count when position wraps around
+  if (position >= 360.0 || position < 0.0) {
+    encoderCount = 0;
   } 
-delay(50);
+
+  delay(50);
 }

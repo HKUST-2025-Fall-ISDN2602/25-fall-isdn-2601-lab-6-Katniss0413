@@ -1,39 +1,20 @@
-/*Change all the ? in the code, add code in ???, modify getPosition() */
+// L298N Driver Pin
+#define MOTOR_ENA 4   // Use a PWM-capable pin
+#define MOTOR_IN1 27
+#define MOTOR_IN2 32
 
-//L298N Driver Pin 
+// Encoder Pins
+#define ENCODER_PINA 34
+#define ENCODER_PINB 35
 
-#define MOTOR_ENA ?  // Replace the ? with the GPIO pin you selected to connect ENA
-#define MOTOR_IN1 ?  // Replace the ? with the GPIO pin you selected to connect IN2
-#define MOTOR_IN2 ?  // Replace the ? with the GPIO pin you selected to connect IN2
-
-//Encoder Pin 
-#define ENCODER_PINA ? // Replace the ? with the GPIO pin you selected to connect encoder A
-#define ENCODER_PINB ? // Replace the ? with the GPIO pin you selected to connect encoder B
-
-//Encoder Counter
-volatile long encoderCount = 0; 
-volatile double position=0; 
+// Encoder Counter
+volatile long encoderCount = 0;
+volatile double position = 0;
 
 // Serial Monitor command for rotation direction
 String command;
 
-
-
-#define MOTOR_IN1 26
-#define MOTOR_IN2 27
-
-//Encoder Pin 
-#define ENCODER_PINA 13
-#define ENCODER_PINB 14
-
-//Encoder Counter
-volatile long encoderCount = 0; 
-volatile double position=0; 
-
-// Serial Monitor command for rotation direction
-String command;
-
-// interruppt
+// Encoder interrupt function
 void IRAM_ATTR encoderInterrupt() {
   if (digitalRead(ENCODER_PINA) != digitalRead(ENCODER_PINB)) {
     encoderCount++;
@@ -42,70 +23,77 @@ void IRAM_ATTR encoderInterrupt() {
   }
 }
 
-//Serial Display Function 
-void getState(){
+// Function to calculate position in degrees
+double getPosition() {
+  // Replace 1000.0 with actual counts per revolution
+  //const float countsPerRevolution = 1000.0; // <-- Replace this after observation
+  //position = float(encoderCount) * 360.0 / 193 countsPerRevolution;
+  position = float(encoderCount)*360.0/194;
+  // Normalize position to [0, 360)
+  if (position < 0) {
+    position += 360;
+  } else if (position >= 360) {
+    position -= 360;
+  }
+
+  return position;
+}
+
+// Serial print function
+void getState() {
   Serial.print("Count: ");
   Serial.println(encoderCount);
   Serial.print("Position: ");
   Serial.println(getPosition());
-  delay(50);
-}
-
-// To get the current position
-/*Modify this function*/ 
-double getPosition() {
-  // Calculate the current position based on encoder count
-  position = float(encoderCount)*360.0/1000.0; // Replace 1000.0 with the actual counts per revolution
-
-  if (position<0)
-  {position = position + 360; // Ensure position is positive
-  }
-  
-  return position;
+  delay(50); // For better readability in Serial Monitor
 }
 
 void setup() {
-  
-/* pin mode for pins connected with L298N driver  */
-  ??? 
+  // Set L298N motor pins
+  pinMode(MOTOR_ENA, OUTPUT);
+  pinMode(MOTOR_IN1, OUTPUT);
+  pinMode(MOTOR_IN2, OUTPUT);
 
-// encoder A pin mode for interrupt
+  // Set encoder pins
   pinMode(ENCODER_PINA, INPUT_PULLUP);
+  pinMode(ENCODER_PINB, INPUT_PULLUP);
+
+  // Attach interrupt to encoder pin A
   attachInterrupt(digitalPinToInterrupt(ENCODER_PINA), encoderInterrupt, CHANGE);
 
-/*encoder B pin mode */   
-  ???
-/* set up baud rate  */
-  ???
-
+  // Start serial communication
+  Serial.begin(115200);
 }
 
 void loop() {
- if (Serial.available() > 0) {
-        command = Serial.readStringUntil('\n'); // Read the incoming command
-        command.trim(); // Remove any leading or trailing whitespace
-        if (command == "F") {
-             /*Forward rotation direction*/
-             ???
-             /*Set a speed for your motor*/
-            ???
+  // Read user command from Serial Monitor
+  if (Serial.available() > 0) {
+    command = Serial.readStringUntil('\n');
+    command.trim(); // Clean whitespace and carriage return
 
-        } 
-        else if (command == "B") {
-             /*Backward rotation direction*/
-             ???
-             /*Set a speed for your motor*/
-            ???
+    if (command == "F") {
+      // Forward direction
+      digitalWrite(MOTOR_IN1, HIGH);
+      digitalWrite(MOTOR_IN2, LOW);
+      analogWrite(MOTOR_ENA, 120); // Set motor speed
+    } else if (command == "B") {
+      // Backward direction
+      digitalWrite(MOTOR_IN1, LOW);
+      digitalWrite(MOTOR_IN2, HIGH);
+      analogWrite(MOTOR_ENA, 120); // Set motor speed
+    }
+  }
 
-        }
-        } 
+  // Print position and encoder count
+  Serial.print("Count: ");
+  Serial.println(encoderCount);
+  Serial.print("Position: ");
+  Serial.println(getPosition());
+  getState();
+  delay(10);
 
-  //print the encoderCount and Position  
-  getState(); 
-
-   /* Reset encoder count*/
-  if (position > 360 || position < 0) {
-    encoderCount = ?;
-  } 
-
+  // Optional: Reset encoder count if out of expected bounds
+  if (position >= 360 || position < 0) {
+    encoderCount = 0;
+  }
 }
